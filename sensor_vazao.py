@@ -1,35 +1,34 @@
-# sensor_vazao.py
 import time
 
 class SensorVazao:
     def __init__(self, vazao_litros_por_segundo):
-        self.vazao = vazao_litros_por_segundo
-        self.tempo_inicio = None
-        self.volume_total_consumido = 0
+        self.vazao_litros_por_segundo = vazao_litros_por_segundo
+        self.volume = 0.0
+        self.start_time = None
 
     def iniciar_medicao(self):
-        self.tempo_inicio = time.time()
-        print("Iniciando medição.")
+        self.start_time = time.time()
+        self.volume = 0.0
 
     def parar_medicao(self):
-        if self.tempo_inicio:
-            elapsed_time = time.time() - self.tempo_inicio
-            self.volume_total_consumido += elapsed_time * self.vazao
-            self.tempo_inicio = None
-            print(f"Volume total consumido: {self.volume_total_consumido:.2f} litros")
-            return self.volume_total_consumido
-
-    def zerar_contagem(self):
-        self.volume_total_consumido = 0
-        print("Zerando contagem.")
+        if self.start_time:
+            self.volume += self.vazao_litros_por_segundo * (time.time() - self.start_time)
+        return self.volume
 
     def obter_volume_atual(self):
-        if self.tempo_inicio:
-            elapsed_time = time.time() - self.tempo_inicio
-            volume_atual = self.volume_total_consumido + elapsed_time * self.vazao
-            return volume_atual
-        else:
-            return self.volume_total_consumido
+        if self.start_time:
+            tempo_decorrido = time.time() - self.start_time
+            self.volume = self.vazao_litros_por_segundo * tempo_decorrido
+        return self.volume
+
+    def zerar_contagem(self):
+        self.volume = 0.0
+        self.start_time = None
+
+    def tempo_decorrido(self):
+        if self.start_time:
+            return (time.time() - self.start_time) / 60  # Retorna o tempo em minutos
+        return 0.0
 
 class ValvulaSolenoid:
     def __init__(self):
@@ -37,8 +36,6 @@ class ValvulaSolenoid:
 
     def abrir(self):
         self.aberta = True
-        print("Válvula aberta.")
 
     def fechar(self):
         self.aberta = False
-        print("Válvula fechada.")
