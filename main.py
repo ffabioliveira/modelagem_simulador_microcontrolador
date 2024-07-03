@@ -3,43 +3,74 @@ from sensor_vazao import SensorVazao, ValvulaSolenoid
 import threading
 import time
 
-# Configuração do sensor e válvula (substitua pelos valores reais)
-vazao_litros_por_segundo = 1.0 / 15 
+vazao_litros_por_segundo = 1.0 / 15  # 1 litro a cada 15 segundos
 sensor = SensorVazao(vazao_litros_por_segundo)
 valvula = ValvulaSolenoid()
 
-# Variável de controle para a thread de publicação
 publicar_volume = False
 
 def publicar_volume_periodicamente(client, tempo_acionamento, intervalo):
     global publicar_volume
     start_time = time.time()
-    tempo_acionamento_segundos = tempo_acionamento * 60 
+    tempo_acionamento_segundos = tempo_acionamento * 60
+    proxima_publicacao = time.time() + 60
+
+    client.publish("microcontrolador/to/borda", "Status: Válvula ligada")
+    print("Microcontrolador informou: Status: Válvula ligada")
 
     while time.time() - start_time < tempo_acionamento_segundos and publicar_volume:
         if valvula.aberta:
+            volume_total = sensor.obter_volume_atual()
+            if time.time() >= proxima_publicacao:
+                client.publish("microcontrolador/to/borda", f"Status: Volume parcial: {volume_total:.2f} litros de água")
+                print(f"Microcontrolador informou: Status: Volume parcial: {volume_total:.2f} litros de água")
+                proxima_publicacao = time.time() + 60
             time.sleep(1)
-            tempo_decorrido = time.time() - start_time
-            volume_atual = sensor.vazao_litros_por_segundo * tempo_decorrido 
-            if tempo_decorrido % 15 == 0:
-                client.publish("maquina2/to/maquina1", f"Status:Volume:{volume_atual:.2f};Tempo:{tempo_decorrido:.2f}")
-                print(f"Publicado: Status:Volume:{volume_atual:.2f};Tempo:{tempo_decorrido:.2f}")
 
-    # Após o tempo de acionamento
+    # Calcular o volume dos segundos restantes
+    tempo_restante = tempo_acionamento_segundos - (time.time() - start_time)
+    volume_restante = sensor.vazao_litros_por_segundo * tempo_restante
+    volume_total += volume_restante
+
     valvula.fechar()
-    sensor.zerar_contagem()
 
-    client.publish("maquina2/to/maquina1", "Status:Válvula desligada")
-    client.publish("maquina2/to/maquina1", f"Status:Volume:{volume_atual:.2f};Tempo:{tempo_acionamento:.2f}") 
-    client.publish("maquina2/to/maquina1", f"Status:Próximo acionamento:{intervalo:.2f}")
-    print("Publicado: Status:Válvula desligada")
-    print(f"Publicado: Status:Volume:{volume_atual:.2f};Tempo:{tempo_acionamento:.2f}")
-    print(f"Publicado: Status:Próximo acionamento:{intervalo:.2f}")
+    client.publish("microcontrolador/to/borda", f"Status: Volume total de água na irrigação: {volume_total:.2f} litros")
+    print(f"Microcontrolador informou: Status: Volume total de água na irrigação: {volume_total:.2f} litros")
+
+    # Zerar contagem do sensor
+    sensor.zerar_contagem()
+    client.publish("microcontrolador/to/borda", "Status: Zerar contagem do volume para a próxima irrigação")
+    print("Microcontrolador informou: Status: Zerar contagem do volume para a próxima irrigação")
+
+    # Verifica se a contagem foi zerada
+    volume_atual = sensor.obter_volume_atual()
+    client.publish("microcontrolador/to/borda", f"Status: Volume zerado: {volume_atual:.2f} litros de água")
+    print(f"Microcontrolador informou: Status: Volume zerado: {volume_atual:.2f} litros de água")
+
+    client.publish("microcontrolador/to/borda", "Status: Válvula desligada")
+    print("Microcontrolador informou: Status: Válvula desligada")
+
+    proximo_acionamento = time.time() + intervalo * 3600
+    horas_restantes = int(intervalo)
+    minutos_restantes = int((intervalo - horas_restantes) * 60)
+    client.publish("microcontrolador/to/borda", f"Status: Próximo acionamento em {horas_restantes:02d}:{minutos_restantes:02d}")
+    print(f"Microcontrolador informou: Status: Próximo acionamento em {horas_restantes:02d}:{minutos_restantes:02d}")
+
+    proxima_mensagem_desligada = time.time() + 600
+    while time.time() < proximo_acionamento:
+        tempo_restante = proximo_acionamento - time.time()
+        if time.time() >= proxima_mensagem_desligada:
+            horas_restantes = int(tempo_restante // 3600)
+            minutos_restantes = int((tempo_restante % 3600) // 60)
+            client.publish("microcontrolador/to/borda", f"Status: Próximo acionamento em {horas_restantes:02d}:{minutos_restantes:02d}")
+            print(f"Microcontrolador informou: Status: Próximo acionamento em {horas_restantes:02d}:{minutos_restantes:02d}")
+            proxima_mensagem_desligada = time.time() + 600
+        time.sleep(60)
 
 def on_message(client, userdata, message):
     global publicar_volume
     mensagem_recebida = message.payload.decode()
-    print(f"Máquina 2 recebeu: {mensagem_recebida}")
+    print(f"Microcontrolador recebeu: {mensagem_recebida}")
 
     if "Ciclo:" in mensagem_recebida:
         ciclo_total = int(mensagem_recebida.split("Ciclo:")[1].split(";")[0])
@@ -51,27 +82,25 @@ def on_message(client, userdata, message):
 
         valvula.abrir()
         sensor.iniciar_medicao()
-        client.publish("maquina2/to/maquina1", "Status:Válvula ligada;Volume:0;Tempo:0")
-        print("Publicado: Status:Válvula ligada;Volume:0;Tempo:0")
-
         publicar_volume = True
         threading.Thread(target=publicar_volume_periodicamente, args=(client, tempo_acionamento, intervalo)).start()
 
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
-        print("Máquina 2 conectada ao broker!")
-        client.subscribe("maquina1/to/maquina2")
-        client.publish("maquina2/to/maquina1", "Máquina 2 conectada!")
+        print("Microcontrolador conectado ao broker!")
+        client.subscribe("borda/to/microcontrolador")
+        client.publish("microcontrolador/to/borda", "Microcontrolador conectado!")
+        print("Microcontrolador informou: Microcontrolador conectado!")
     else:
-        print(f"Falha na conexão da Máquina 2. Código de retorno: {rc}")
+        print(f"Falha na conexão do Microcontrolador. Código de retorno: {rc}")
 
 if __name__ == '__main__':
-    broker = '10.0.0.117'  # Substitua pelo endereço IP do seu broker MQTT
-    client = mqtt.Client("maquina2")
+    broker = '10.0.0.117'
+    client = mqtt.Client("microcontrolador")
     client.on_connect = on_connect
     client.on_message = on_message
 
-    print("Conectando Máquina 2 ao broker...")
+    print("Conectando Microcontrolador ao broker...")
     client.connect(broker)
 
     client.loop_forever()
