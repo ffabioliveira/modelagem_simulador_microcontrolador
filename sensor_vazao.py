@@ -29,13 +29,3 @@ class SensorVazao:
         if self.start_time:
             return (time.time() - self.start_time) / 60  # Retorna o tempo em minutos
         return 0.0
-
-class ValvulaSolenoid:
-    def __init__(self):
-        self.aberta = False
-
-    def abrir(self):
-        self.aberta = True
-
-    def fechar(self):
-        self.aberta = False
