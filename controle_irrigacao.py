@@ -20,15 +20,15 @@ class ControleIrrigacao:
             self.sensor.iniciar_medicao()
             self.publicar_volume = True
             threading.Thread(target=self.monitorar_acao).start()
-            self.comunicacao.enviar_mensagem("microcontrolador/to/borda", "Status: Válvula l>
+            self.comunicacao.enviar_mensagem("microcontrolador/to/borda", "Status: Válvula ligada")
 
         elif mensagem_recebida == "desligar_valvula":
             volume_total = self.sensor.obter_volume_atual()
             self.valvula.fechar()
-            self.comunicacao.enviar_mensagem("microcontrolador/to/borda", f"Status: Volume t>
+            self.comunicacao.enviar_mensagem("microcontrolador/to/borda", f"Status: Volume total: {volume_total} litros")
             self.sensor.zerar_contagem()
-            self.comunicacao.enviar_mensagem("microcontrolador/to/borda", "Status: Zerar con>
-            self.comunicacao.enviar_mensagem("microcontrolador/to/borda", "Status: Válvula d>
+            self.comunicacao.enviar_mensagem("microcontrolador/to/borda", "Status: Zerar contagem")
+            self.comunicacao.enviar_mensagem("microcontrolador/to/borda", "Status: Válvula desligada")
             self.publicar_volume = False
 
     def monitorar_acao(self):
