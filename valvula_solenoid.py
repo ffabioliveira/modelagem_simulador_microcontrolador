@@ -3,10 +3,15 @@ class ValvulaSolenoid:
         self.aberta = False
 
     def abrir(self):
-        self.aberta = True
-        print("Válvula aberta.")
+        if not self.aberta:
+            self.aberta = True
+            print("Válvula aberta.")
+        else:
+            print("A válvula já está aberta.")
 
     def fechar(self):
-        self.aberta = False
-        print("Válvula fechada.")
-
+        if self.aberta:
+            self.aberta = False
+            print("Válvula fechada.")
+        else:
+            print("A válvula já está fechada.")

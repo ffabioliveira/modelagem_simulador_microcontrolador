@@ -14,5 +14,8 @@ class Main:
 if __name__ == '__main__':
     sistema = Main('10.0.0.117', 'microcontrolador')
     sistema.iniciar()
-    while True:
-        time.sleep(1)  # Manter o script rodando
+    try:
+        while True:
+            time.sleep(1)  # Manter o script rodando
+    except KeyboardInterrupt:
+        print("Interrompido pelo usuário.")

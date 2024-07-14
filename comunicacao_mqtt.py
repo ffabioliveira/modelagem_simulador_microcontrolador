@@ -9,11 +9,17 @@ class ComunicacaoMQTT:
     def conectar(self):
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
-        self.client.connect(self.broker)
-        self.client.loop_start()
+        try:
+            self.client.connect(self.broker)
+            self.client.loop_start()
+        except Exception as e:
+            print(f"Erro ao conectar ao broker: {e}")
 
     def enviar_mensagem(self, topico, mensagem):
-        self.client.publish(topico, mensagem)
+        try:
+            self.client.publish(topico, mensagem)
+        except Exception as e:
+            print(f"Erro ao enviar mensagem: {e}")
 
     def inscrever(self, topico, callback):
         self.on_message_callback = callback
